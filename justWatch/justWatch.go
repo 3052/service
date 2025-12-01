@@ -111,7 +111,10 @@ func (h *HrefLangTag) Offers(localeVar *Locale) ([]Offer, error) {
    }
    if resp.StatusCode != http.StatusOK {
       var data strings.Builder
-      resp.Write(&data)
+      err = resp.Write(&data)
+      if err != nil {
+         return nil, err
+      }
       return nil, errors.New(data.String())
    }
    defer resp.Body.Close()
