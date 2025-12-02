@@ -22,7 +22,7 @@ func main() {
    flag.Parse()
    cache, err := os.UserCacheDir()
    if err != nil {
-      panic(err)
+      log.Fatal(err)
    }
    cache = filepath.ToSlash(cache) + "/nordVpn/ServerLoads"
    switch {
@@ -34,7 +34,7 @@ func main() {
       flag.Usage()
    }
    if err != nil {
-      panic(err)
+      log.Fatal(err)
    }
 }
 
