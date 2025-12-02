@@ -24,7 +24,7 @@ func main() {
    if set.address != "" {
       err := set.do_address()
       if err != nil {
-         panic(err)
+         log.Fatal(err)
       }
    } else {
       flag.Usage()
