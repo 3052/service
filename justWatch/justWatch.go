@@ -9,7 +9,6 @@ import (
    "encoding/base64"
    "encoding/json"
    "errors"
-   "log"
    "maps"
    "net/http"
    "net/url"
@@ -85,6 +84,7 @@ func GroupAndSortByURL(offers []EnrichedOffer) ([]StandardWebUrl, map[StandardWe
 
    return slices.Sorted(maps.Keys(groupedOffers)), groupedOffers
 }
+
 type Offer struct {
    ElementCount     int64          
    MonetizationType string         
@@ -290,16 +290,6 @@ var EnUs = Locales{
 }
 
 type Locales []Locale
-
-var Transport = http.Transport{
-   Protocols: &http.Protocols{}, // github.com/golang/go/issues/25793
-   Proxy: func(req *http.Request) (*url.URL, error) {
-      if req.URL.Path != "/graphql" {
-         log.Println(req.Method, req.URL)
-      }
-      return http.ProxyFromEnvironment(req)
-   },
-}
 
 const fetcher_query = `
 query BackendConstantsFetcherQuery($language: Language!) {

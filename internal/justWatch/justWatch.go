@@ -7,6 +7,7 @@ import (
    "fmt"
    "log"
    "net/http"
+   "net/url"
    "os"
    "path"
    "strings"
@@ -15,24 +16,42 @@ import (
 
 func main() {
    log.SetFlags(log.Ltime)
-   http.DefaultClient.Transport = &justWatch.Transport
-   var set flag_set
-   flag.StringVar(&set.address, "a", "", "address")
-   flag.DurationVar(&set.sleep, "s", 99*time.Millisecond, "sleep")
-   flag.StringVar(&set.filters, "f", "BUY,CINEMA,FAST,RENT", "filters")
-   flag.Parse()
-   if set.address != "" {
-      err := set.do_address()
-      if err != nil {
-         log.Fatal(err)
-      }
-   } else {
-      flag.Usage()
+   http.DefaultTransport = &http.Transport{
+      Protocols: &http.Protocols{}, // github.com/golang/go/issues/25793
+      Proxy: func(req *http.Request) (*url.URL, error) {
+         if req.URL.Path != "/graphql" {
+            log.Println(req.Method, req.URL)
+         }
+         return http.ProxyFromEnvironment(req)
+      },
+   }
+   err := new(command).run()
+   if err != nil {
+      log.Fatal(err)
    }
 }
 
-func (f *flag_set) do_address() error {
-   url_path, err := justWatch.GetPath(f.address)
+func (c *command) run() error {
+   flag.StringVar(&c.address, "a", "", "address")
+   flag.DurationVar(&c.sleep, "s", 99*time.Millisecond, "sleep")
+   flag.StringVar(&c.filters, "f", "BUY,CINEMA,FAST,RENT", "filters")
+   flag.Parse()
+
+   if c.address != "" {
+      return c.do_address()
+   }
+   flag.Usage()
+   return nil
+}
+
+type command struct {
+   address string
+   filters string
+   sleep   time.Duration
+}
+
+func (c *command) do_address() error {
+   url_path, err := justWatch.GetPath(c.address)
    if err != nil {
       return err
    }
@@ -57,24 +76,21 @@ func (f *flag_set) do_address() error {
             justWatch.EnrichedOffer{Offer: offer, Locale: locale},
          )
       }
-      time.Sleep(f.sleep)
+      time.Sleep(c.sleep)
    }
    enrichedOffers := justWatch.Deduplicate(allEnrichedOffers)
    enrichedOffers = justWatch.FilterOffers(
-      enrichedOffers, strings.Split(f.filters, ",")...,
+      enrichedOffers, strings.Split(c.filters, ",")...,
    )
    sortedUrls, groupedOffers := justWatch.GroupAndSortByURL(enrichedOffers)
    var data []byte
-   for index, url := range sortedUrls {
+   for index, address := range sortedUrls {
       if index >= 1 {
          data = append(data, '\n')
       }
-      data = fmt.Appendln(data, url)
-      for offerIndex, enrichedOffer := range groupedOffers[url] {
-         if offerIndex >= 1 {
-            data = append(data, '\n')
-         }
-         data = fmt.Appendln(data, "country =", enrichedOffer.Locale.Country)
+      data = fmt.Appendln(data, "##", address)
+      for _, enrichedOffer := range groupedOffers[address] {
+         data = fmt.Appendln(data, "\ncountry =", enrichedOffer.Locale.Country)
          data = fmt.Appendln(data, "name =", enrichedOffer.Locale.CountryName)
          data = fmt.Appendln(data, "monetization =", enrichedOffer.Offer.MonetizationType)
          if enrichedOffer.Offer.ElementCount >= 1 {
@@ -82,16 +98,7 @@ func (f *flag_set) do_address() error {
          }
       }
    }
-   return write_file(path.Base(url_path), data)
-}
-
-func write_file(name string, data []byte) error {
+   name := path.Base(url_path) + ".md"
    log.Println("WriteFile", name)
    return os.WriteFile(name, data, os.ModePerm)
-}
-
-type flag_set struct {
-   address string
-   sleep   time.Duration
-   filters string
 }
