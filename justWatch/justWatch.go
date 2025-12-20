@@ -86,7 +86,7 @@ func GroupAndSortByURL(offers []EnrichedOffer) ([]StandardWebUrl, map[StandardWe
 }
 
 type Offer struct {
-   ElementCount     int64          
+   ElementCount     int
    MonetizationType string         
    StandardWebUrl   StandardWebUrl 
 }
