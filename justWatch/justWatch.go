@@ -16,14 +16,36 @@ import (
    "strings"
 )
 
+type Offer struct {
+   ElementCount     int
+   MonetizationType string         
+   StandardWebUrl   string 
+}
+
+// GroupAndSortByUrl groups offers by URL and sorts the groups.
+// Within each group, offers are sorted by country.
+func GroupAndSortByUrl(offers []EnrichedOffer) ([]string, map[string][]EnrichedOffer) {
+   groupedOffers := make(map[string][]EnrichedOffer)
+   for _, offer := range offers {
+      key := strings.TrimSuffix(offer.Offer.StandardWebUrl, "\n")
+      groupedOffers[key] = append(groupedOffers[key], offer)
+   }
+
+   for _, offerGroup := range groupedOffers {
+      slices.SortFunc(offerGroup, func(a, b EnrichedOffer) int {
+         return cmp.Compare(a.Locale.Country, b.Locale.Country)
+      })
+   }
+
+   return slices.Sorted(maps.Keys(groupedOffers)), groupedOffers
+}
+
 // Struct definitions
 type Locale struct {
    FullLocale  string
    Country     string
    CountryName string
 }
-
-type StandardWebUrl string
 
 type EnrichedOffer struct {
    Offer  Offer
@@ -65,30 +87,6 @@ func FilterOffers(offers []EnrichedOffer, unwantedTypes ...string) []EnrichedOff
       }
    }
    return filteredOffers
-}
-
-// GroupAndSortByURL groups offers by URL and sorts the groups.
-// Within each group, offers are sorted by country.
-func GroupAndSortByURL(offers []EnrichedOffer) ([]StandardWebUrl, map[StandardWebUrl][]EnrichedOffer) {
-   groupedOffers := make(map[StandardWebUrl][]EnrichedOffer)
-   for _, offer := range offers {
-      key := offer.Offer.StandardWebUrl
-      groupedOffers[key] = append(groupedOffers[key], offer)
-   }
-
-   for _, offerGroup := range groupedOffers {
-      slices.SortFunc(offerGroup, func(a, b EnrichedOffer) int {
-         return cmp.Compare(a.Locale.Country, b.Locale.Country)
-      })
-   }
-
-   return slices.Sorted(maps.Keys(groupedOffers)), groupedOffers
-}
-
-type Offer struct {
-   ElementCount     int
-   MonetizationType string         
-   StandardWebUrl   StandardWebUrl 
 }
 
 func (h *HrefLangTag) Offers(localeVar *Locale) ([]Offer, error) {
@@ -387,12 +385,6 @@ func (l Locales) Locale(tag *HrefLangTag) (*Locale, bool) {
       }
    }
    return nil, false
-}
-
-func (s *StandardWebUrl) UnmarshalText(data []byte) error {
-   data1 := strings.TrimSuffix(string(data), "\n")
-   *s = StandardWebUrl(data1)
-   return nil
 }
 
 func (c *Content) Fetch(path string) error {

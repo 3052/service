@@ -5,12 +5,12 @@ import (
    "bytes"
    "errors"
    "flag"
-   "fmt"
    "log"
    "net/http"
    "net/url"
    "os"
    "path"
+   "strconv"
    "strings"
    "time"
 )
@@ -47,14 +47,14 @@ func (c *command) do_address() error {
    enrichedOffers = justWatch.FilterOffers(
       enrichedOffers, strings.Split(c.filters, ",")...,
    )
-   sortedUrls, groupedOffers := justWatch.GroupAndSortByURL(enrichedOffers)
+   sortedUrls, groupedOffers := justWatch.GroupAndSortByUrl(enrichedOffers)
    data := &bytes.Buffer{}
-   for index, address := range sortedUrls {
-      if index >= 1 {
-         data.WriteByte('\n')
+   for i, address := range sortedUrls {
+      if i >= 1 {
+         data.WriteString("\n\n")
       }
-      data.WriteString("##")
-      fmt.Fprint(data, address)
+      data.WriteString("## ")
+      data.WriteString(address)
       for _, enriched := range groupedOffers[address] {
          data.WriteByte('\n')
          data.WriteString("\ncountry = ")
@@ -65,7 +65,7 @@ func (c *command) do_address() error {
          data.WriteString(enriched.Offer.MonetizationType)
          if enriched.Offer.ElementCount >= 1 {
             data.WriteString("\ncount = ")
-            fmt.Fprint(data, enriched.Offer.ElementCount)
+            data.WriteString(strconv.Itoa(enriched.Offer.ElementCount))
          }
       }
    }
