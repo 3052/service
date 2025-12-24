@@ -17,15 +17,15 @@ var Transport = http.Transport{
 }
 
 func FormatProxy(username, password, hostname string) string {
-   var b strings.Builder
-   b.WriteString("https://")
-   b.WriteString(username)
-   b.WriteByte(':')
-   b.WriteString(password)
-   b.WriteByte('@')
-   b.WriteString(hostname)
-   b.WriteString(":89")
-   return b.String()
+   var data strings.Builder
+   data.WriteString("https://")
+   data.WriteString(username)
+   data.WriteByte(':')
+   data.WriteString(password)
+   data.WriteByte('@')
+   data.WriteString(hostname)
+   data.WriteString(":89")
+   return data.String()
 }
 
 type Server struct {
