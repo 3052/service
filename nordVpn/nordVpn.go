@@ -2,18 +2,36 @@ package nordVpn
 
 import (
    "encoding/json"
-   "log"
    "net/http"
    "net/url"
    "strconv"
    "strings"
 )
 
-var Transport = http.Transport{
-   Proxy: func(req *http.Request) (*url.URL, error) {
-      log.Println(req.Method, req.URL)
-      return http.ProxyFromEnvironment(req)
-   },
+// limit <= -1 for default
+// limit == 0 for all
+func GetServers(limit int) ([]Server, error) {
+   var req http.Request
+   req.Header = http.Header{}
+   req.URL = &url.URL{
+      Scheme: "https",
+      Host: "api.nordvpn.com",
+      Path: "/v1/servers",
+   }
+   if limit >= 0 {
+      req.URL.RawQuery = "limit=" + strconv.Itoa(limit)
+   }
+   resp, err := http.DefaultClient.Do(&req)
+   if err != nil {
+      return nil, err
+   }
+   defer resp.Body.Close()
+   var result []Server
+   err = json.NewDecoder(resp.Body).Decode(&result)
+   if err != nil {
+      return nil, err
+   }
+   return result, nil
 }
 
 func FormatProxy(username, password, hostname string) string {
@@ -103,24 +121,4 @@ func (s ServerLoads) Country(code string) (string, bool) {
       return load.Hostname, true
    }
    return "", false
-}
-
-// limit <= -1 for default
-// limit == 0 for all
-func GetServers(limit int) ([]Server, error) {
-   req, _ := http.NewRequest("", "https://api.nordvpn.com/v1/servers", nil)
-   if limit >= 0 {
-      req.URL.RawQuery = "limit=" + strconv.Itoa(limit)
-   }
-   resp, err := http.DefaultClient.Do(req)
-   if err != nil {
-      return nil, err
-   }
-   defer resp.Body.Close()
-   var servers []Server
-   err = json.NewDecoder(resp.Body).Decode(&servers)
-   if err != nil {
-      return nil, err
-   }
-   return servers, nil
 }

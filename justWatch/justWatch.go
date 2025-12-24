@@ -16,6 +16,71 @@ import (
    "strings"
 )
 
+func FetchLocales(language string) (Locales, error) {
+   data, err := json.Marshal(map[string]any{
+      "query": graphql_compact(fetcher_query),
+      "variables": map[string]string{
+         "language": language,
+      },
+   })
+   if err != nil {
+      return nil, err
+   }
+   req, err := http.NewRequest(
+      "POST", "https://apis.justwatch.com/graphql", bytes.NewReader(data),
+   )
+   if err != nil {
+      return nil, err
+   }
+   req.Header.Set("content-type", "application/json")
+   req.Header.Set(
+      "device-id", base64.RawStdEncoding.EncodeToString(make([]byte, 16)),
+   )
+   resp, err := http.DefaultClient.Do(req)
+   if err != nil {
+      return nil, err
+   }
+   if resp.StatusCode != http.StatusOK {
+      var data strings.Builder
+      err = resp.Write(&data)
+      if err != nil {
+         return nil, err
+      }
+      return nil, errors.New(data.String())
+   }
+   defer resp.Body.Close()
+   var result struct {
+      Data struct {
+         Locales Locales
+      }
+   }
+   err = json.NewDecoder(resp.Body).Decode(&result)
+   if err != nil {
+      return nil, err
+   }
+   return result.Data.Locales, nil
+}
+
+func (c *Content) Fetch(path string) error {
+   var req http.Request
+   req.Header = http.Header{}
+   req.URL = &url.URL{
+      Scheme: "https",
+      Host: "apis.justwatch.com",
+      Path: "/content/urls",
+      RawQuery: "path=" + path,
+   }
+   resp, err := http.DefaultClient.Do(&req)
+   if err != nil {
+      return err
+   }
+   defer resp.Body.Close()
+   if resp.StatusCode != http.StatusOK {
+      return errors.New(resp.Status)
+   }
+   return json.NewDecoder(resp.Body).Decode(c)
+}
+
 type Offer struct {
    ElementCount     int
    MonetizationType string         
@@ -116,7 +181,7 @@ func (h *HrefLangTag) Offers(localeVar *Locale) ([]Offer, error) {
       return nil, errors.New(data.String())
    }
    defer resp.Body.Close()
-   var value struct {
+   var result struct {
       Data struct {
          Url struct {
             Node struct {
@@ -125,11 +190,11 @@ func (h *HrefLangTag) Offers(localeVar *Locale) ([]Offer, error) {
          }
       }
    }
-   err = json.NewDecoder(resp.Body).Decode(&value)
+   err = json.NewDecoder(resp.Body).Decode(&result)
    if err != nil {
       return nil, err
    }
-   return value.Data.Url.Node.Offers, nil
+   return result.Data.Url.Node.Offers, nil
 }
 
 // https://justwatch.com/us/movie/goodfellas
@@ -333,51 +398,6 @@ type Content struct {
    HrefLangTags []HrefLangTag `json:"href_lang_tags"`
 }
 
-func FetchLocales(language string) (Locales, error) {
-   data, err := json.Marshal(map[string]any{
-      "query": graphql_compact(fetcher_query),
-      "variables": map[string]string{
-         "language": language,
-      },
-   })
-   if err != nil {
-      return nil, err
-   }
-   req, err := http.NewRequest(
-      "POST", "https://apis.justwatch.com/graphql", bytes.NewReader(data),
-   )
-   if err != nil {
-      return nil, err
-   }
-   req.Header.Set("content-type", "application/json")
-   req.Header.Set(
-      "device-id", base64.RawStdEncoding.EncodeToString(make([]byte, 16)),
-   )
-   resp, err := http.DefaultClient.Do(req)
-   if err != nil {
-      return nil, err
-   }
-   if resp.StatusCode != http.StatusOK {
-      var data bytes.Buffer
-      err = resp.Write(&data)
-      if err != nil {
-         return nil, err
-      }
-      return nil, errors.New(data.String())
-   }
-   defer resp.Body.Close()
-   var value struct {
-      Data struct {
-         Locales Locales
-      }
-   }
-   err = json.NewDecoder(resp.Body).Decode(&value)
-   if err != nil {
-      return nil, err
-   }
-   return value.Data.Locales, nil
-}
-
 func (l Locales) Locale(tag *HrefLangTag) (*Locale, bool) {
    for _, locale_var := range l {
       if locale_var.FullLocale == tag.Locale {
@@ -385,21 +405,4 @@ func (l Locales) Locale(tag *HrefLangTag) (*Locale, bool) {
       }
    }
    return nil, false
-}
-
-func (c *Content) Fetch(path string) error {
-   req, _ := http.NewRequest("", "https://apis.justwatch.com", nil)
-   req.URL.Path = "/content/urls"
-   req.URL.RawQuery = url.Values{
-      "path": {path},
-   }.Encode()
-   resp, err := http.DefaultClient.Do(req)
-   if err != nil {
-      return err
-   }
-   defer resp.Body.Close()
-   if resp.StatusCode != http.StatusOK {
-      return errors.New(resp.Status)
-   }
-   return json.NewDecoder(resp.Body).Decode(c)
 }

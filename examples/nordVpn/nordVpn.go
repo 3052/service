@@ -8,6 +8,7 @@ import (
    "io"
    "log"
    "net/http"
+   "net/url"
    "os"
    "os/exec"
    "path/filepath"
@@ -15,8 +16,13 @@ import (
 )
 
 func main() {
-   http.DefaultTransport = &nordVpn.Transport
    log.SetFlags(log.Ltime)
+   http.DefaultTransport = &http.Transport{
+      Proxy: func(req *http.Request) (*url.URL, error) {
+         log.Println(req.Method, req.URL)
+         return http.ProxyFromEnvironment(req)
+      },
+   }
    write := flag.Bool("w", false, "write")
    country_code := flag.String("c", "", "country code")
    flag.Parse()
