@@ -44,10 +44,10 @@ func main() {
    }
 }
 
-func command(name string, arg ...string) ([]byte, error) {
-   c := exec.Command(name, arg...)
-   log.Println("Output", c.Args)
-   return c.Output()
+func output(name string, arg ...string) ([]byte, error) {
+   command := exec.Command(name, arg...)
+   log.Println("Output", command.Args)
+   return command.Output()
 }
 
 func do_country(name, code string) error {
@@ -72,11 +72,11 @@ func do_country(name, code string) error {
    if err != nil {
       return err
    }
-   user, err := command("credential", "-h", "api.nordvpn.com", "-k", "user")
+   user, err := output("credential", "-h=api.nordvpn.com", "-k=user")
    if err != nil {
       return err
    }
-   password, err := command("credential", "-h", "api.nordvpn.com")
+   password, err := output("credential", "-h=api.nordvpn.com")
    if err != nil {
       return err
    }
