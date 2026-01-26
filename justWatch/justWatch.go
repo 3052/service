@@ -16,49 +16,43 @@ import (
    "strings"
 )
 
-func FetchLocales(language string) (Locales, error) {
-   data, err := json.Marshal(map[string]any{
-      "query": graphql_compact(fetcher_query),
-      "variables": map[string]string{
-         "language": language,
-      },
-   })
-   if err != nil {
-      return nil, err
+const fetcher_query = `
+query BackendConstantsFetcherQuery($language: Language!) {
+   locales {
+      country
+      countryName(language: $language)
+      fullLocale
    }
-   req, err := http.NewRequest(
-      "POST", "https://apis.justwatch.com/graphql", bytes.NewReader(data),
-   )
-   if err != nil {
-      return nil, err
-   }
-   req.Header.Set("content-type", "application/json")
-   req.Header.Set(
-      "device-id", base64.RawStdEncoding.EncodeToString(make([]byte, 16)),
-   )
-   resp, err := http.DefaultClient.Do(req)
-   if err != nil {
-      return nil, err
-   }
-   if resp.StatusCode != http.StatusOK {
-      var data strings.Builder
-      err = resp.Write(&data)
-      if err != nil {
-         return nil, err
-      }
-      return nil, errors.New(data.String())
-   }
-   defer resp.Body.Close()
-   var result struct {
-      Data struct {
-         Locales Locales
+}
+`
+
+const title_details = `
+query GetUrlTitleDetails(
+   $fullPath: String!
+   $country: Country!
+   $platform: Platform! = WEB
+) {
+   url(fullPath: $fullPath) {
+      node {
+         ... on MovieOrShowOrSeason {
+            offers(country: $country, platform: $platform) {
+               elementCount
+               monetizationType
+               standardWebURL
+            }
+         }
       }
    }
-   err = json.NewDecoder(resp.Body).Decode(&result)
-   if err != nil {
-      return nil, err
-   }
-   return result.Data.Locales, nil
+}
+`
+
+// this is better than strings.Replace and strings.ReplaceAll
+func graphql_compact(data string) string {
+   return strings.Join(strings.Fields(data), " ")
+}
+
+type Content struct {
+   HrefLangTags []HrefLangTag `json:"href_lang_tags"`
 }
 
 func (c *Content) Fetch(path string) error {
@@ -81,132 +75,9 @@ func (c *Content) Fetch(path string) error {
    return json.NewDecoder(resp.Body).Decode(c)
 }
 
-type Offer struct {
-   ElementCount     int
-   MonetizationType string         
-   StandardWebUrl   string 
-}
-
-// GroupAndSortByUrl groups offers by URL and sorts the groups.
-// Within each group, offers are sorted by country.
-func GroupAndSortByUrl(offers []EnrichedOffer) ([]string, map[string][]EnrichedOffer) {
-   groupedOffers := make(map[string][]EnrichedOffer)
-   for _, offer := range offers {
-      key := strings.TrimSuffix(offer.Offer.StandardWebUrl, "\n")
-      groupedOffers[key] = append(groupedOffers[key], offer)
-   }
-
-   for _, offerGroup := range groupedOffers {
-      slices.SortFunc(offerGroup, func(a, b EnrichedOffer) int {
-         return cmp.Compare(a.Locale.Country, b.Locale.Country)
-      })
-   }
-
-   return slices.Sorted(maps.Keys(groupedOffers)), groupedOffers
-}
-
-// Struct definitions
-type Locale struct {
-   FullLocale  string
-   Country     string
-   CountryName string
-}
-
-type EnrichedOffer struct {
-   Offer  Offer
-   Locale *Locale
-}
-
-// Deduplicate removes true duplicates where both the Offer and Locale are identical.
-func Deduplicate(offers []EnrichedOffer) []EnrichedOffer {
-   // 1. Sort the slice. This brings identical EnrichedOffers next to each other.
-   slices.SortFunc(offers, func(a, b EnrichedOffer) int {
-      if n := cmp.Compare(a.Offer.StandardWebUrl, b.Offer.StandardWebUrl); n != 0 {
-         return n
-      }
-      if n := cmp.Compare(a.Offer.MonetizationType, b.Offer.MonetizationType); n != 0 {
-         return n
-      }
-      if n := cmp.Compare(a.Offer.ElementCount, b.Offer.ElementCount); n != 0 {
-         return n
-      }
-      return cmp.Compare(a.Locale.FullLocale, b.Locale.FullLocale)
-   })
-
-   // 2. Compact the sorted slice, removing consecutive duplicates.
-   return slices.CompactFunc(offers, func(a, b EnrichedOffer) bool {
-      return a.Offer == b.Offer && a.Locale == b.Locale
-   })
-}
-
-// FilterOffers removes offers with unwanted monetization types.
-func FilterOffers(offers []EnrichedOffer, unwantedTypes ...string) []EnrichedOffer {
-   unwantedSet := make(map[string]struct{}, len(unwantedTypes))
-   for _, t := range unwantedTypes {
-      unwantedSet[t] = struct{}{}
-   }
-   var filteredOffers []EnrichedOffer
-   for _, offer := range offers {
-      if _, found := unwantedSet[offer.Offer.MonetizationType]; !found {
-         filteredOffers = append(filteredOffers, offer)
-      }
-   }
-   return filteredOffers
-}
-
-func (h *HrefLangTag) Offers(localeVar *Locale) ([]Offer, error) {
-   data, err := json.Marshal(map[string]any{
-      "query": graphql_compact(title_details),
-      "variables": map[string]string{
-         "country":  localeVar.Country,
-         "fullPath": h.Href,
-      },
-   })
-   if err != nil {
-      return nil, err
-   }
-   resp, err := http.Post(
-      "https://apis.justwatch.com/graphql", "application/json",
-      bytes.NewReader(data),
-   )
-   if err != nil {
-      return nil, err
-   }
-   if resp.StatusCode != http.StatusOK {
-      var data strings.Builder
-      err = resp.Write(&data)
-      if err != nil {
-         return nil, err
-      }
-      return nil, errors.New(data.String())
-   }
-   defer resp.Body.Close()
-   var result struct {
-      Data struct {
-         Url struct {
-            Node struct {
-               Offers []Offer
-            }
-         }
-      }
-   }
-   err = json.NewDecoder(resp.Body).Decode(&result)
-   if err != nil {
-      return nil, err
-   }
-   return result.Data.Url.Node.Offers, nil
-}
-
-// https://justwatch.com/us/movie/goodfellas
-func GetPath(rawUrl string) (string, error) {
-   u, err := url.Parse(rawUrl)
-   if err != nil {
-      return "", err
-   }
-   if u.Scheme == "" {
-      return "", errors.New("invalid URL: scheme is missing")
-   }
-   return u.Path, nil
+type HrefLangTag struct {
+   Href   string // /ar/pelicula/mulholland-drive
+   Locale string // es_AR
 }
 
 // 2025-11-04
@@ -354,50 +225,6 @@ var EnUs = Locales{
 
 type Locales []Locale
 
-const fetcher_query = `
-query BackendConstantsFetcherQuery($language: Language!) {
-   locales {
-      country
-      countryName(language: $language)
-      fullLocale
-   }
-}
-`
-
-const title_details = `
-query GetUrlTitleDetails(
-   $fullPath: String!
-   $country: Country!
-   $platform: Platform! = WEB
-) {
-   url(fullPath: $fullPath) {
-      node {
-         ... on MovieOrShowOrSeason {
-            offers(country: $country, platform: $platform) {
-               elementCount
-               monetizationType
-               standardWebURL
-            }
-         }
-      }
-   }
-}
-` // dont use `query(`
-
-// this is better than strings.Replace and strings.ReplaceAll
-func graphql_compact(data string) string {
-   return strings.Join(strings.Fields(data), " ")
-}
-
-type HrefLangTag struct {
-   Href   string // /ar/pelicula/mulholland-drive
-   Locale string // es_AR
-}
-
-type Content struct {
-   HrefLangTags []HrefLangTag `json:"href_lang_tags"`
-}
-
 func (l Locales) Locale(tag *HrefLangTag) (*Locale, bool) {
    for _, locale_var := range l {
       if locale_var.FullLocale == tag.Locale {
@@ -405,4 +232,179 @@ func (l Locales) Locale(tag *HrefLangTag) (*Locale, bool) {
       }
    }
    return nil, false
+}
+
+func FetchLocales(language string) (Locales, error) {
+   data, err := json.Marshal(map[string]any{
+      "query": graphql_compact(fetcher_query),
+      "variables": map[string]string{
+         "language": language,
+      },
+   })
+   if err != nil {
+      return nil, err
+   }
+   req, err := http.NewRequest(
+      "POST", "https://apis.justwatch.com/graphql", bytes.NewReader(data),
+   )
+   if err != nil {
+      return nil, err
+   }
+   req.Header.Set("content-type", "application/json")
+   req.Header.Set(
+      "device-id", base64.RawStdEncoding.EncodeToString(make([]byte, 16)),
+   )
+   resp, err := http.DefaultClient.Do(req)
+   if err != nil {
+      return nil, err
+   }
+   if resp.StatusCode != http.StatusOK {
+      var data strings.Builder
+      err = resp.Write(&data)
+      if err != nil {
+         return nil, err
+      }
+      return nil, errors.New(data.String())
+   }
+   defer resp.Body.Close()
+   var result struct {
+      Data struct {
+         Locales Locales
+      }
+   }
+   err = json.NewDecoder(resp.Body).Decode(&result)
+   if err != nil {
+      return nil, err
+   }
+   return result.Data.Locales, nil
+}
+
+///
+
+type Offer struct {
+   ElementCount     int
+   MonetizationType string         
+   StandardWebUrl   string 
+}
+
+// GroupAndSortByUrl groups offers by URL and sorts the groups.
+// Within each group, offers are sorted by country.
+func GroupAndSortByUrl(offers []EnrichedOffer) ([]string, map[string][]EnrichedOffer) {
+   groupedOffers := make(map[string][]EnrichedOffer)
+   for _, offer := range offers {
+      key := strings.TrimSuffix(offer.Offer.StandardWebUrl, "\n")
+      groupedOffers[key] = append(groupedOffers[key], offer)
+   }
+
+   for _, offerGroup := range groupedOffers {
+      slices.SortFunc(offerGroup, func(a, b EnrichedOffer) int {
+         return cmp.Compare(a.Locale.Country, b.Locale.Country)
+      })
+   }
+
+   return slices.Sorted(maps.Keys(groupedOffers)), groupedOffers
+}
+
+// Struct definitions
+type Locale struct {
+   FullLocale  string
+   Country     string
+   CountryName string
+}
+
+type EnrichedOffer struct {
+   Offer  Offer
+   Locale *Locale
+}
+
+// Deduplicate removes true duplicates where both the Offer and Locale are identical.
+func Deduplicate(offers []EnrichedOffer) []EnrichedOffer {
+   // 1. Sort the slice. This brings identical EnrichedOffers next to each other.
+   slices.SortFunc(offers, func(a, b EnrichedOffer) int {
+      if n := cmp.Compare(a.Offer.StandardWebUrl, b.Offer.StandardWebUrl); n != 0 {
+         return n
+      }
+      if n := cmp.Compare(a.Offer.MonetizationType, b.Offer.MonetizationType); n != 0 {
+         return n
+      }
+      if n := cmp.Compare(a.Offer.ElementCount, b.Offer.ElementCount); n != 0 {
+         return n
+      }
+      return cmp.Compare(a.Locale.FullLocale, b.Locale.FullLocale)
+   })
+
+   // 2. Compact the sorted slice, removing consecutive duplicates.
+   return slices.CompactFunc(offers, func(a, b EnrichedOffer) bool {
+      return a.Offer == b.Offer && a.Locale == b.Locale
+   })
+}
+
+// FilterOffers removes offers with unwanted monetization types.
+func FilterOffers(offers []EnrichedOffer, unwantedTypes ...string) []EnrichedOffer {
+   unwantedSet := make(map[string]struct{}, len(unwantedTypes))
+   for _, t := range unwantedTypes {
+      unwantedSet[t] = struct{}{}
+   }
+   var filteredOffers []EnrichedOffer
+   for _, offer := range offers {
+      if _, found := unwantedSet[offer.Offer.MonetizationType]; !found {
+         filteredOffers = append(filteredOffers, offer)
+      }
+   }
+   return filteredOffers
+}
+
+func (h *HrefLangTag) Offers(localeVar *Locale) ([]Offer, error) {
+   data, err := json.Marshal(map[string]any{
+      "query": graphql_compact(title_details),
+      "variables": map[string]string{
+         "country":  localeVar.Country,
+         "fullPath": h.Href,
+      },
+   })
+   if err != nil {
+      return nil, err
+   }
+   resp, err := http.Post(
+      "https://apis.justwatch.com/graphql", "application/json",
+      bytes.NewReader(data),
+   )
+   if err != nil {
+      return nil, err
+   }
+   if resp.StatusCode != http.StatusOK {
+      var data strings.Builder
+      err = resp.Write(&data)
+      if err != nil {
+         return nil, err
+      }
+      return nil, errors.New(data.String())
+   }
+   defer resp.Body.Close()
+   var result struct {
+      Data struct {
+         Url struct {
+            Node struct {
+               Offers []Offer
+            }
+         }
+      }
+   }
+   err = json.NewDecoder(resp.Body).Decode(&result)
+   if err != nil {
+      return nil, err
+   }
+   return result.Data.Url.Node.Offers, nil
+}
+
+// https://justwatch.com/us/movie/goodfellas
+func GetPath(rawUrl string) (string, error) {
+   u, err := url.Parse(rawUrl)
+   if err != nil {
+      return "", err
+   }
+   if u.Scheme == "" {
+      return "", errors.New("invalid URL: scheme is missing")
+   }
+   return u.Path, nil
 }

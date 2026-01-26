@@ -42,6 +42,7 @@ func main() {
       State struct {
          Constant struct {
             Providers []struct {
+               HasTitles bool
                Slug      string 
             }
          }
@@ -53,8 +54,11 @@ func main() {
       log.Fatalf("failed to unmarshal JSON: %v", err)
    }
    // --- Step 3: Use the structured data (this part will not be reached) ---
-   fmt.Println("Successfully unmarshaled the data.")
-   for i, provider := range result.State.Constant.Providers {
-      fmt.Println(i+1, provider.Slug)
+   var i int
+   for _, provider := range result.State.Constant.Providers {
+      if provider.HasTitles {
+         i++
+         fmt.Println(i, provider.Slug)
+      }
    }
 }
