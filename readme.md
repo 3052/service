@@ -1,13 +1,8 @@
-# platform
+# service
 
-- https://bandcamp.com
 - https://justwatch.com
 - https://nordvpn.com
-- https://soundcloud.com
 
+## Discord
 
-# justWatch
-
-https://play.google.com/store/apps/details?id=com.justwatch.justwatch
-
-Create Android 6 device. Install user certificate
+https://discord.com/invite/rMFzDRQhSx
