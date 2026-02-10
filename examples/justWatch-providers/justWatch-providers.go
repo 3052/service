@@ -7,9 +7,16 @@ import (
    "io"
    "log"
    "net/http"
+   "net/url"
 )
 
 func main() {
+   http.DefaultTransport = &http.Transport{
+      Proxy: func(req *http.Request) (*url.URL, error) {
+         log.Println(req.Method, req.URL)
+         return nil, nil
+      },
+   }
    // Make an HTTP GET request to the URL
    res, err := http.Get("https://www.justwatch.com/us")
    if err != nil {
