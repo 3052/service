@@ -30,7 +30,7 @@ func main() {
    if err != nil {
       log.Fatal(err)
    }
-   cache = filepath.ToSlash(cache) + "/nordVpn/ServerLoads"
+   cache = filepath.ToSlash(cache) + "/nordVpn/nordVpn.json"
    switch {
    case *country_code != "":
       err = do_country(cache, *country_code)
