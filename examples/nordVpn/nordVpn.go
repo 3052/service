@@ -15,41 +15,6 @@ import (
    "time"
 )
 
-func main() {
-   log.SetFlags(log.Ltime)
-   http.DefaultTransport = &http.Transport{
-      Proxy: func(req *http.Request) (*url.URL, error) {
-         log.Println(req.Method, req.URL)
-         return http.ProxyFromEnvironment(req)
-      },
-   }
-   write := flag.Bool("w", false, "write")
-   country_code := flag.String("c", "", "country code")
-   flag.Parse()
-   cache, err := os.UserCacheDir()
-   if err != nil {
-      log.Fatal(err)
-   }
-   cache = filepath.ToSlash(cache) + "/nordVpn/nordVpn.json"
-   switch {
-   case *country_code != "":
-      err = do_country(cache, *country_code)
-   case *write:
-      err = do_write(cache)
-   default:
-      flag.Usage()
-   }
-   if err != nil {
-      log.Fatal(err)
-   }
-}
-
-func output(name string, arg ...string) ([]byte, error) {
-   command := exec.Command(name, arg...)
-   log.Println("Output", command.Args)
-   return command.Output()
-}
-
 func do_country(name, code string) error {
    data, err := read_file(name)
    if err != nil {
@@ -116,4 +81,38 @@ func read_file(name string) ([]byte, error) {
       return nil, errors.New("ModTime")
    }
    return io.ReadAll(file)
+}
+func main() {
+   log.SetFlags(log.Ltime)
+   http.DefaultTransport = &http.Transport{
+      Proxy: func(req *http.Request) (*url.URL, error) {
+         log.Println(req.Method, req.URL)
+         return http.ProxyFromEnvironment(req)
+      },
+   }
+   write := flag.Bool("w", false, "write")
+   country_code := flag.String("c", "", "country code")
+   flag.Parse()
+   cache, err := os.UserCacheDir()
+   if err != nil {
+      log.Fatal(err)
+   }
+   cache = filepath.ToSlash(cache) + "/nordVpn/nordVpn.json"
+   switch {
+   case *country_code != "":
+      err = do_country(cache, *country_code)
+   case *write:
+      err = do_write(cache)
+   default:
+      flag.Usage()
+   }
+   if err != nil {
+      log.Fatal(err)
+   }
+}
+
+func output(name string, arg ...string) ([]byte, error) {
+   command := exec.Command(name, arg...)
+   log.Println("Output", command.Args)
+   return command.Output()
 }
