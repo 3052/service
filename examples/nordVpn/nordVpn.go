@@ -37,7 +37,7 @@ func do_country(name, code string) error {
    if err != nil {
       return err
    }
-   user, err := output("credential", "-h=api.nordvpn.com", "-k=user")
+   user, err := output("credential", "-h=api.nordvpn.com", "-k=username")
    if err != nil {
       return err
    }

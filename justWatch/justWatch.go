@@ -16,45 +16,6 @@ import (
    "strings"
 )
 
-const fetcher_query = `
-query BackendConstantsFetcherQuery($language: Language!) {
-   locales {
-      country
-      countryName(language: $language)
-      fullLocale
-   }
-}
-`
-
-const title_details = `
-query GetUrlTitleDetails(
-   $fullPath: String!
-   $country: Country!
-   $platform: Platform! = WEB
-) {
-   url(fullPath: $fullPath) {
-      node {
-         ... on MovieOrShowOrSeason {
-            offers(country: $country, platform: $platform) {
-               elementCount
-               monetizationType
-               standardWebURL
-            }
-         }
-      }
-   }
-}
-`
-
-// this is better than strings.Replace and strings.ReplaceAll
-func graphql_compact(data string) string {
-   return strings.Join(strings.Fields(data), " ")
-}
-
-type Content struct {
-   HrefLangTags []HrefLangTag `json:"href_lang_tags"`
-}
-
 func (c *Content) Fetch(path string) error {
    var req http.Request
    req.Header = http.Header{}
@@ -62,7 +23,7 @@ func (c *Content) Fetch(path string) error {
       Scheme: "https",
       Host: "apis.justwatch.com",
       Path: "/content/urls",
-      RawQuery: "path=" + path,
+      RawQuery: url.Values{"path": {path}}.Encode(),
    }
    resp, err := http.DefaultClient.Do(&req)
    if err != nil {
@@ -407,4 +368,42 @@ func GetPath(rawUrl string) (string, error) {
       return "", errors.New("invalid URL: scheme is missing")
    }
    return u.Path, nil
+}
+const fetcher_query = `
+query BackendConstantsFetcherQuery($language: Language!) {
+   locales {
+      country
+      countryName(language: $language)
+      fullLocale
+   }
+}
+`
+
+const title_details = `
+query GetUrlTitleDetails(
+   $fullPath: String!
+   $country: Country!
+   $platform: Platform! = WEB
+) {
+   url(fullPath: $fullPath) {
+      node {
+         ... on MovieOrShowOrSeason {
+            offers(country: $country, platform: $platform) {
+               elementCount
+               monetizationType
+               standardWebURL
+            }
+         }
+      }
+   }
+}
+`
+
+// this is better than strings.Replace and strings.ReplaceAll
+func graphql_compact(data string) string {
+   return strings.Join(strings.Fields(data), " ")
+}
+
+type Content struct {
+   HrefLangTags []HrefLangTag `json:"href_lang_tags"`
 }
