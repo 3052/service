@@ -38,7 +38,7 @@ func (c *command) do_address() error {
       }
       for _, offer := range offers {
          allEnrichedOffers = append(allEnrichedOffers,
-            justWatch.EnrichedOffer{Offer: offer, Locale: locale},
+            justWatch.EnrichedOffer{Locale: locale, Offer: &offer},
          )
       }
       time.Sleep(c.sleep)

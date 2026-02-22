@@ -115,6 +115,7 @@ func main() {
       }
    }
 }
+
 // processCountry fetches and parses provider data for a given country.
 // It returns an ordered slice of provider slugs that match the filter.
 func processCountry(countryCode string, providerFilter map[string]bool) []string {

@@ -15,8 +15,8 @@ func GetServers(limit int) ([]Server, error) {
    req.Header = http.Header{}
    req.URL = &url.URL{
       Scheme: "https",
-      Host: "api.nordvpn.com",
-      Path: "/v1/servers",
+      Host:   "api.nordvpn.com",
+      Path:   "/v1/servers",
    }
    if limit >= 0 {
       req.URL.RawQuery = "limit=" + strconv.Itoa(limit)

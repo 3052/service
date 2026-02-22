@@ -16,13 +16,72 @@ import (
    "strings"
 )
 
+var paramsToDelete = [][2]string{
+   {"autoplay", "1"},
+   {"jw", ""},
+   {"package", "plc"},
+   {"referrer", "JustWatch"},
+   {"source", "bing"},
+   {"utm_campaign", "justwatch"},
+   {"utm_campaign", "vod_feed"},
+   {"utm_content", ""},
+   {"utm_medium", "deeplink"},
+   {"utm_medium", "feed"},
+   {"utm_medium", "partner"},
+   {"utm_source", "justWatch-v2-catalog"},
+   {"utm_source", "justwatch"},
+   {"utm_source", "universal_search"},
+   {"utm_term", ""},
+}
+
+func getUrlGroupingKey(rawUrl string) string {
+   trimmedUrl := strings.TrimSuffix(rawUrl, "\n")
+   parsed, err := url.Parse(trimmedUrl)
+   if err != nil {
+      return trimmedUrl
+   }
+   if parsed.RawQuery == "" {
+      return parsed.String()
+   }
+   query := parsed.Query()
+   for _, rule := range paramsToDelete {
+      keyToDelete := rule[0]
+      valueToDelete := rule[1]
+      // .Get() returns the first value. If the key doesn't exist, it returns "".
+      // This perfectly handles the "assume one value" rule.
+      if query.Get(keyToDelete) == valueToDelete {
+         delete(query, keyToDelete)
+      }
+   }
+   parsed.RawQuery = query.Encode()
+   return parsed.String()
+}
+
+func GroupAndSortByUrl(offers []EnrichedOffer) ([]string, map[string][]EnrichedOffer) {
+   groupedOffers := make(map[string][]EnrichedOffer)
+   for _, offer := range offers {
+      key := getUrlGroupingKey(offer.Offer.StandardWebUrl)
+      groupedOffers[key] = append(groupedOffers[key], offer)
+   }
+   for _, offerGroup := range groupedOffers {
+      slices.SortFunc(offerGroup, func(a, b EnrichedOffer) int {
+         return cmp.Compare(a.Locale.Country, b.Locale.Country)
+      })
+   }
+   // This works for Go 1.21 and older.
+   keys := slices.SortedFunc(maps.Keys(groupedOffers), func(a, b string) int {
+      return cmp.Compare(len(a), len(b))
+   })
+   return keys, groupedOffers
+}
+
 func (c *Content) Fetch(path string) error {
    var req http.Request
    req.Header = http.Header{}
    req.URL = &url.URL{
-      Scheme: "https",
-      Host: "apis.justwatch.com",
-      Path: "/content/urls",
+      Scheme:   "https",
+      Host:     "apis.justwatch.com",
+      Path:     "/content/urls",
       RawQuery: url.Values{"path": {path}}.Encode(),
    }
    resp, err := http.DefaultClient.Do(&req)
@@ -240,66 +299,6 @@ func FetchLocales(language string) (Locales, error) {
    return result.Data.Locales, nil
 }
 
-///
-
-type Offer struct {
-   ElementCount     int
-   MonetizationType string         
-   StandardWebUrl   string 
-}
-
-// GroupAndSortByUrl groups offers by URL and sorts the groups.
-// Within each group, offers are sorted by country.
-func GroupAndSortByUrl(offers []EnrichedOffer) ([]string, map[string][]EnrichedOffer) {
-   groupedOffers := make(map[string][]EnrichedOffer)
-   for _, offer := range offers {
-      key := strings.TrimSuffix(offer.Offer.StandardWebUrl, "\n")
-      groupedOffers[key] = append(groupedOffers[key], offer)
-   }
-
-   for _, offerGroup := range groupedOffers {
-      slices.SortFunc(offerGroup, func(a, b EnrichedOffer) int {
-         return cmp.Compare(a.Locale.Country, b.Locale.Country)
-      })
-   }
-
-   return slices.Sorted(maps.Keys(groupedOffers)), groupedOffers
-}
-
-// Struct definitions
-type Locale struct {
-   FullLocale  string
-   Country     string
-   CountryName string
-}
-
-type EnrichedOffer struct {
-   Offer  Offer
-   Locale *Locale
-}
-
-// Deduplicate removes true duplicates where both the Offer and Locale are identical.
-func Deduplicate(offers []EnrichedOffer) []EnrichedOffer {
-   // 1. Sort the slice. This brings identical EnrichedOffers next to each other.
-   slices.SortFunc(offers, func(a, b EnrichedOffer) int {
-      if n := cmp.Compare(a.Offer.StandardWebUrl, b.Offer.StandardWebUrl); n != 0 {
-         return n
-      }
-      if n := cmp.Compare(a.Offer.MonetizationType, b.Offer.MonetizationType); n != 0 {
-         return n
-      }
-      if n := cmp.Compare(a.Offer.ElementCount, b.Offer.ElementCount); n != 0 {
-         return n
-      }
-      return cmp.Compare(a.Locale.FullLocale, b.Locale.FullLocale)
-   })
-
-   // 2. Compact the sorted slice, removing consecutive duplicates.
-   return slices.CompactFunc(offers, func(a, b EnrichedOffer) bool {
-      return a.Offer == b.Offer && a.Locale == b.Locale
-   })
-}
-
 // FilterOffers removes offers with unwanted monetization types.
 func FilterOffers(offers []EnrichedOffer, unwantedTypes ...string) []EnrichedOffer {
    unwantedSet := make(map[string]struct{}, len(unwantedTypes))
@@ -369,6 +368,7 @@ func GetPath(rawUrl string) (string, error) {
    }
    return u.Path, nil
 }
+
 const fetcher_query = `
 query BackendConstantsFetcherQuery($language: Language!) {
    locales {
