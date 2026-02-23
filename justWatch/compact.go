@@ -25,6 +25,7 @@ type EnrichedOffer struct {
 // Deduplicate removes true duplicates where both the Offer and Locale are identical.
 func Deduplicate(offers []EnrichedOffer) []EnrichedOffer {
    // 1. Sort the slice. This brings identical EnrichedOffers next to each other.
+   // This part is correct as it compares the underlying values.
    slices.SortFunc(offers, func(a, b EnrichedOffer) int {
       if n := cmp.Compare(a.Offer.StandardWebUrl, b.Offer.StandardWebUrl); n != 0 {
          return n
@@ -37,9 +38,13 @@ func Deduplicate(offers []EnrichedOffer) []EnrichedOffer {
       }
       return cmp.Compare(a.Locale.FullLocale, b.Locale.FullLocale)
    })
-
    // 2. Compact the sorted slice, removing consecutive duplicates.
+   // CORRECTED: The comparison function now compares the actual data fields,
+   // not the memory addresses of the pointers.
    return slices.CompactFunc(offers, func(a, b EnrichedOffer) bool {
-      return a.Offer == b.Offer && a.Locale == b.Locale
+      return a.Offer.StandardWebUrl == b.Offer.StandardWebUrl &&
+         a.Offer.MonetizationType == b.Offer.MonetizationType &&
+         a.Offer.ElementCount == b.Offer.ElementCount &&
+         a.Locale.FullLocale == b.Locale.FullLocale
    })
 }
