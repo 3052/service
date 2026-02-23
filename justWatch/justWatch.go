@@ -16,6 +16,76 @@ import (
    "strings"
 )
 
+func GroupAndSortByUrl(offers []*EnrichedOffer) ([]string, map[string][]*EnrichedOffer) {
+   groupedOffers := make(map[string][]*EnrichedOffer)
+   for _, offer := range offers {
+      key := getUrlGroupingKey(offer.Offer.StandardWebUrl)
+      groupedOffers[key] = append(groupedOffers[key], offer)
+   }
+   for _, offerGroup := range groupedOffers {
+      slices.SortFunc(offerGroup, func(a, b *EnrichedOffer) int {
+         return cmp.Compare(a.Locale.Country, b.Locale.Country)
+      })
+   }
+   // This works for Go 1.21 and older.
+   keys := slices.SortedFunc(maps.Keys(groupedOffers), func(a, b string) int {
+      return cmp.Compare(len(a), len(b))
+   })
+   return keys, groupedOffers
+}
+
+// FilterOffers removes offers with unwanted monetization types.
+func FilterOffers(offers []*EnrichedOffer, unwantedTypes ...string) []*EnrichedOffer {
+   unwantedSet := make(map[string]struct{}, len(unwantedTypes))
+   for _, unwanted := range unwantedTypes {
+      unwantedSet[unwanted] = struct{}{}
+   }
+   var filteredOffers []*EnrichedOffer
+   for _, offer := range offers {
+      if _, found := unwantedSet[offer.Offer.MonetizationType]; !found {
+         filteredOffers = append(filteredOffers, offer)
+      }
+   }
+   return filteredOffers
+}
+
+type Offer struct {
+   ElementCount     int
+   MonetizationType string
+   StandardWebUrl   string
+}
+
+type Locale struct {
+   FullLocale  string
+   Country     string
+   CountryName string
+}
+
+type EnrichedOffer struct {
+   Locale *Locale
+   Offer  *Offer
+}
+
+// Deduplicate removes true duplicates where both the Offer and Locale are identical.
+func Deduplicate(offers []*EnrichedOffer) []*EnrichedOffer {
+   // 1. Sort the slice. This brings identical EnrichedOffers next to each other.
+   // This part is correct as it compares the underlying values.
+   slices.SortFunc(offers, func(a, b *EnrichedOffer) int {
+      return cmp.Or(
+         cmp.Compare(a.Offer.StandardWebUrl, b.Offer.StandardWebUrl),
+         cmp.Compare(a.Offer.MonetizationType, b.Offer.MonetizationType),
+         a.Offer.ElementCount - b.Offer.ElementCount,
+         cmp.Compare(a.Locale.FullLocale, b.Locale.FullLocale),
+      )
+   })
+   // 2. Compact the sorted slice, removing consecutive duplicates.
+   return slices.CompactFunc(offers, func(a, b *EnrichedOffer) bool {
+      return a.Offer.StandardWebUrl == b.Offer.StandardWebUrl &&
+         a.Offer.MonetizationType == b.Offer.MonetizationType &&
+         a.Offer.ElementCount == b.Offer.ElementCount &&
+         a.Locale.FullLocale == b.Locale.FullLocale
+   })
+}
 var paramsToDelete = [][2]string{
    {"autoplay", "1"},
    {"jw", ""},
@@ -55,24 +125,6 @@ func getUrlGroupingKey(rawUrl string) string {
    }
    parsed.RawQuery = query.Encode()
    return parsed.String()
-}
-
-func GroupAndSortByUrl(offers []EnrichedOffer) ([]string, map[string][]EnrichedOffer) {
-   groupedOffers := make(map[string][]EnrichedOffer)
-   for _, offer := range offers {
-      key := getUrlGroupingKey(offer.Offer.StandardWebUrl)
-      groupedOffers[key] = append(groupedOffers[key], offer)
-   }
-   for _, offerGroup := range groupedOffers {
-      slices.SortFunc(offerGroup, func(a, b EnrichedOffer) int {
-         return cmp.Compare(a.Locale.Country, b.Locale.Country)
-      })
-   }
-   // This works for Go 1.21 and older.
-   keys := slices.SortedFunc(maps.Keys(groupedOffers), func(a, b string) int {
-      return cmp.Compare(len(a), len(b))
-   })
-   return keys, groupedOffers
 }
 
 func (c *Content) Fetch(path string) error {
@@ -297,21 +349,6 @@ func FetchLocales(language string) (Locales, error) {
       return nil, err
    }
    return result.Data.Locales, nil
-}
-
-// FilterOffers removes offers with unwanted monetization types.
-func FilterOffers(offers []EnrichedOffer, unwantedTypes ...string) []EnrichedOffer {
-   unwantedSet := make(map[string]struct{}, len(unwantedTypes))
-   for _, t := range unwantedTypes {
-      unwantedSet[t] = struct{}{}
-   }
-   var filteredOffers []EnrichedOffer
-   for _, offer := range offers {
-      if _, found := unwantedSet[offer.Offer.MonetizationType]; !found {
-         filteredOffers = append(filteredOffers, offer)
-      }
-   }
-   return filteredOffers
 }
 
 func (h *HrefLangTag) Offers(localeVar *Locale) ([]Offer, error) {
