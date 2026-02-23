@@ -16,6 +16,25 @@ import (
    "strings"
 )
 
+var params_to_delete = [][2]string{
+   {"autoplay", "1"},
+   {"jw", ""},
+   {"package", "plc"},
+   {"referrer", "JustWatch"},
+   {"searchReferral", ""},
+   {"source", "bing"},
+   {"utm_campaign", "justwatch"},
+   {"utm_campaign", "vod_feed"},
+   {"utm_content", ""},
+   {"utm_medium", "deeplink"},
+   {"utm_medium", "feed"},
+   {"utm_medium", "partner"},
+   {"utm_source", "justWatch-v2-catalog"},
+   {"utm_source", "justwatch"},
+   {"utm_source", "universal_search"},
+   {"utm_term", ""},
+}
+
 func GroupAndSortByUrl(offers []*EnrichedOffer) ([]string, map[string][]*EnrichedOffer) {
    groupedOffers := make(map[string][]*EnrichedOffer)
    for _, offer := range offers {
@@ -86,23 +105,6 @@ func Deduplicate(offers []*EnrichedOffer) []*EnrichedOffer {
          a.Locale.FullLocale == b.Locale.FullLocale
    })
 }
-var paramsToDelete = [][2]string{
-   {"autoplay", "1"},
-   {"jw", ""},
-   {"package", "plc"},
-   {"referrer", "JustWatch"},
-   {"source", "bing"},
-   {"utm_campaign", "justwatch"},
-   {"utm_campaign", "vod_feed"},
-   {"utm_content", ""},
-   {"utm_medium", "deeplink"},
-   {"utm_medium", "feed"},
-   {"utm_medium", "partner"},
-   {"utm_source", "justWatch-v2-catalog"},
-   {"utm_source", "justwatch"},
-   {"utm_source", "universal_search"},
-   {"utm_term", ""},
-}
 
 func getUrlGroupingKey(rawUrl string) string {
    trimmedUrl := strings.TrimSuffix(rawUrl, "\n")
@@ -114,7 +116,7 @@ func getUrlGroupingKey(rawUrl string) string {
       return parsed.String()
    }
    query := parsed.Query()
-   for _, rule := range paramsToDelete {
+   for _, rule := range params_to_delete {
       keyToDelete := rule[0]
       valueToDelete := rule[1]
       // .Get() returns the first value. If the key doesn't exist, it returns "".
