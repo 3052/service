@@ -93,7 +93,7 @@ func Deduplicate(offers []*EnrichedOffer) []*EnrichedOffer {
       return cmp.Or(
          cmp.Compare(a.Offer.StandardWebUrl, b.Offer.StandardWebUrl),
          cmp.Compare(a.Offer.MonetizationType, b.Offer.MonetizationType),
-         a.Offer.ElementCount - b.Offer.ElementCount,
+         a.Offer.ElementCount-b.Offer.ElementCount,
          cmp.Compare(a.Locale.FullLocale, b.Locale.FullLocale),
       )
    })
