@@ -16,25 +16,6 @@ import (
    "strings"
 )
 
-var params_to_delete = [][2]string{
-   {"autoplay", "1"},
-   {"jw", ""},
-   {"package", "plc"},
-   {"referrer", "JustWatch"},
-   {"searchReferral", ""},
-   {"source", "bing"},
-   {"utm_campaign", "justwatch"},
-   {"utm_campaign", "vod_feed"},
-   {"utm_content", ""},
-   {"utm_medium", "deeplink"},
-   {"utm_medium", "feed"},
-   {"utm_medium", "partner"},
-   {"utm_source", "justWatch-v2-catalog"},
-   {"utm_source", "justwatch"},
-   {"utm_source", "universal_search"},
-   {"utm_term", ""},
-}
-
 func GroupAndSortByUrl(offers []*EnrichedOffer) ([]string, map[string][]*EnrichedOffer) {
    groupedOffers := make(map[string][]*EnrichedOffer)
    for _, offer := range offers {
@@ -104,29 +85,6 @@ func Deduplicate(offers []*EnrichedOffer) []*EnrichedOffer {
          a.Offer.ElementCount == b.Offer.ElementCount &&
          a.Locale.FullLocale == b.Locale.FullLocale
    })
-}
-
-func getUrlGroupingKey(rawUrl string) string {
-   trimmedUrl := strings.TrimSuffix(rawUrl, "\n")
-   parsed, err := url.Parse(trimmedUrl)
-   if err != nil {
-      return trimmedUrl
-   }
-   if parsed.RawQuery == "" {
-      return parsed.String()
-   }
-   query := parsed.Query()
-   for _, rule := range params_to_delete {
-      keyToDelete := rule[0]
-      valueToDelete := rule[1]
-      // .Get() returns the first value. If the key doesn't exist, it returns "".
-      // This perfectly handles the "assume one value" rule.
-      if query.Get(keyToDelete) == valueToDelete {
-         delete(query, keyToDelete)
-      }
-   }
-   parsed.RawQuery = query.Encode()
-   return parsed.String()
 }
 
 func (c *Content) Fetch(path string) error {
