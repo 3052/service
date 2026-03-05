@@ -66,22 +66,6 @@ func write_file(name string, data []byte) error {
    return os.WriteFile(name, data, os.ModePerm)
 }
 
-func read_file(name string) ([]byte, error) {
-   file, err := os.Open(name)
-   if err != nil {
-      return nil, err
-   }
-   defer file.Close()
-   info, err := file.Stat()
-   if err != nil {
-      return nil, err
-   }
-   const month = 30 * 24 * time.Hour
-   if time.Since(info.ModTime()) >= month {
-      return nil, errors.New("ModTime")
-   }
-   return io.ReadAll(file)
-}
 func main() {
    log.SetFlags(log.Ltime)
    http.DefaultTransport = &http.Transport{
@@ -115,4 +99,19 @@ func output(name string, arg ...string) ([]byte, error) {
    command := exec.Command(name, arg...)
    log.Println("Output", command.Args)
    return command.Output()
+}
+func read_file(name string) ([]byte, error) {
+   file, err := os.Open(name)
+   if err != nil {
+      return nil, err
+   }
+   defer file.Close()
+   info, err := file.Stat()
+   if err != nil {
+      return nil, err
+   }
+   if time.Since(info.ModTime()) >= 24*time.Hour {
+      return nil, errors.New("ModTime")
+   }
+   return io.ReadAll(file)
 }
