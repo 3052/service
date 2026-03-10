@@ -17,9 +17,8 @@ import (
 
 func main() {
    log.SetFlags(log.Ltime)
-   var protocol http.Protocols
    http.DefaultTransport = &http.Transport{
-      Protocols: &protocol, // github.com/golang/go/issues/25793
+      DisableKeepAlives: true, // github.com/golang/go/issues/25793
       Proxy: func(req *http.Request) (*url.URL, error) {
          log.Println(req.Method, req.URL)
          return nil, nil
