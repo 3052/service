@@ -6,6 +6,7 @@ package justWatch
 import (
    "bytes"
    "cmp"
+   _ "embed"
    "encoding/base64"
    "encoding/json"
    "errors"
@@ -14,7 +15,6 @@ import (
    "net/url"
    "slices"
    "strings"
-   _ "embed"
 )
 
 //go:embed GetUrlTitleDetails.gql

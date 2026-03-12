@@ -50,6 +50,7 @@ type command struct {
    filters string
    sleep   time.Duration
 }
+
 func (c *command) do_address() error {
    url_path, err := justWatch.GetPath(c.address)
    if err != nil {
