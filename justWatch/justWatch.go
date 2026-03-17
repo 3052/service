@@ -65,6 +65,7 @@ func getUrlGroupingKey(rawUrl string) string {
    parsed.RawQuery = query.Encode()
    return parsed.String()
 }
+
 func GroupAndSortByUrl(offers []*EnrichedOffer) ([]string, map[string][]*EnrichedOffer) {
    groupedOffers := make(map[string][]*EnrichedOffer)
    for _, offer := range offers {
@@ -102,12 +103,6 @@ type Offer struct {
    ElementCount     int
    MonetizationType string
    StandardWebUrl   string
-}
-
-type Locale struct {
-   FullLocale  string
-   Country     string
-   CountryName string
 }
 
 type EnrichedOffer struct {
@@ -304,18 +299,24 @@ var EnUs = Locales{
    {FullLocale: "ar_YE", Country: "YE", CountryName: "Yemen"},
 }
 
-type Locales []Locale
-
 func (l Locales) Locale(tag *HrefLangTag) (*Locale, bool) {
-   for _, locale_var := range l {
-      if locale_var.FullLocale == tag.Locale {
-         return &locale_var, true
+   for _, locale_data := range l {
+      if locale_data.FullLocale == tag.Locale {
+         return &locale_data, true
       }
    }
    return nil, false
 }
 
-func FetchLocales(language string) (Locales, error) {
+type Locale struct {
+   FullLocale  string
+   Country     string
+   CountryName string
+}
+
+type Locales []Locale
+
+func Hello(language string) (Locales, error) {
    data, err := json.Marshal(map[string]any{
       "query": backend_constants_fetcher_query,
       "variables": map[string]string{
