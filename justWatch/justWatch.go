@@ -99,12 +99,6 @@ func FilterOffers(offers []*EnrichedOffer, unwantedTypes ...string) []*EnrichedO
    return filteredOffers
 }
 
-type Offer struct {
-   ElementCount     int
-   MonetizationType string
-   StandardWebUrl   string
-}
-
 type EnrichedOffer struct {
    Locale *Locale
    Offer  *Offer
@@ -130,6 +124,14 @@ func Deduplicate(offers []*EnrichedOffer) []*EnrichedOffer {
          a.Locale.FullLocale == b.Locale.FullLocale
    })
 }
+
+type Offer struct {
+   ElementCount     int
+   MonetizationType string
+   StandardWebUrl   string
+}
+
+///
 
 func (c *Content) Fetch(path string) error {
    var req http.Request
